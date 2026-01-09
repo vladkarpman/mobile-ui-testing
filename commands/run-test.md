@@ -177,40 +177,35 @@ For each test in `tests` array:
    - Execute the action
    - Report result (success with details, or failure with diagnostics)
    - On failure: capture screenshot, gather element list, stop test
-4. Track end time
-5. Report: PASSED or FAILED with step count and duration
+4. **Baseline Comparison (if available)**:
+   After each step that has a corresponding baseline:
+   - Take screenshot of current state
+   - Load baseline image from `baselines/step_{N}_*.png`
+   - Compare images:
+     - If similar (>90% match): PASS
+     - If different: WARN with visual diff
+   - Report baseline mismatches:
+     ```
+     Step 3: tap "Login"
+       ✓ Action completed
+       ⚠ Visual mismatch with baseline
+         Expected: baselines/step_03_dashboard.png
+         Actual: reports/run_step_03.png
+         Diff: 15% pixels different
+     ```
+   - **Note**: Baseline comparison is only available for folder-format tests that have a `baselines/` directory.
+5. Track end time
+6. Report: PASSED or FAILED with step count and duration
 
-### 8. Baseline Comparison (if available)
-
-After each step that has a corresponding baseline:
-
-1. Take screenshot of current state
-2. Load baseline image from `baselines/step_{N}_*.png`
-3. Compare images:
-   - If similar (>90% match): PASS
-   - If different: WARN with visual diff
-
-Report baseline mismatches:
-```
-Step 3: tap "Login"
-  ✓ Action completed
-  ⚠ Visual mismatch with baseline
-    Expected: baselines/step_03_dashboard.png
-    Actual: reports/run_step_03.png
-    Diff: 15% pixels different
-```
-
-**Note**: Baseline comparison is only available for folder-format tests that have a `baselines/` directory.
-
-### 9. Execute Teardown
+### 8. Execute Teardown
 
 Run all actions in `teardown` section after all tests (even if tests failed).
 
-### 10. Report Summary
+### 9. Report Summary
 
 Show the summary table with all test results.
 
-### 11. Generate Report (if --report)
+### 10. Generate Report (if --report)
 
 If `--report` flag was provided:
 
