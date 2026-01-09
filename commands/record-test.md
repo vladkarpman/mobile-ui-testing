@@ -6,6 +6,7 @@ allowed-tools:
   - Read
   - Write
   - Glob
+  - Bash
   - AskUserQuestion
   - mcp__mobile-mcp__mobile_list_available_devices
   - mcp__mobile-mcp__mobile_list_apps
@@ -93,31 +94,13 @@ Do your first action, then say "done".
 ══════════════════════════════════════════════
 ```
 
-### 7. Create Test Folder Structure
-
-Before starting, create the folder structure:
-
-```
-tests/{test-name}/
-├── screenshots/
-├── baselines/
-└── reports/
-```
-
-Use Bash to create directories:
-```bash
-mkdir -p tests/{test-name}/screenshots
-mkdir -p tests/{test-name}/baselines
-mkdir -p tests/{test-name}/reports
-```
-
-### 8. Guided Recording Loop
+### 7. Guided Recording Loop
 
 Wait for user to say "done" (or variations: "ok", "next", "ready", "finished").
 
 When user signals done:
 
-**Step 8.1: Burst Capture**
+**Step 7.1: Burst Capture**
 
 Take 7 screenshots rapidly over 2 seconds:
 
@@ -132,14 +115,14 @@ Save each screenshot to `tests/{test-name}/screenshots/` with naming:
 - `{action_number}_{shot_number}_{timestamp}.png`
 - Example: `001_01_20260109_204512.png`
 
-**Step 8.2: Analyze Screenshots**
+**Step 7.2: Analyze Screenshots**
 
 Compare consecutive screenshots:
 1. Diff element lists - what appeared/disappeared?
 2. Identify distinct states (group similar screenshots)
 3. Detect: tap (element gone), type (text changed), swipe (elements shifted), navigation (new screen)
 
-**Step 8.3: Report to User**
+**Step 7.3: Report to User**
 
 ```
 Captured 7 screenshots, detected {N} states:
@@ -152,7 +135,7 @@ Inferred action: {action_type} "{target}" → {result}
 Ready for next action.
 ```
 
-**Step 8.4: Update Recording State**
+**Step 7.4: Update Recording State**
 
 Add to `.claude/recording-state.json`:
 ```json
@@ -170,11 +153,11 @@ Add to `.claude/recording-state.json`:
 }
 ```
 
-**Step 8.5: Loop**
+**Step 7.5: Loop**
 
-Repeat from step 8 until user says "stop recording" or "/stop-recording".
+Repeat from Step 7.1 until user says "stop recording" or "/stop-recording".
 
-### 9. Handle User Messages During Recording
+### 8. Handle User Messages During Recording
 
 - "done" / "ok" / "next" / "finished" → trigger burst capture
 - "stop" / "stop recording" / "/stop-recording" → end recording
