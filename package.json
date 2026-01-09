@@ -1,0 +1,33 @@
+{
+  "name": "claude-plugin-mobile-ui-testing",
+  "version": "1.0.0",
+  "description": "YAML-based mobile UI testing framework for Claude Code with mobile-mcp",
+  "author": "Vladislav Karpman",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vladkarpman/mobile-ui-testing.git"
+  },
+  "homepage": "https://github.com/vladkarpman/mobile-ui-testing#readme",
+  "bugs": {
+    "url": "https://github.com/vladkarpman/mobile-ui-testing/issues"
+  },
+  "keywords": [
+    "claude-code",
+    "claude-code-plugin",
+    "mobile-testing",
+    "ui-testing",
+    "yaml",
+    "android",
+    "ios",
+    "mobile-mcp",
+    "automation"
+  ],
+  "files": [
+    ".claude-plugin",
+    "commands",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ]
+}
