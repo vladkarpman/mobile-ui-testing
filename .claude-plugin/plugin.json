@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "description": "YAML-based mobile UI testing framework for Claude Code with mobile-mcp",
   "author": {
-    "name": "Vladislav Karpman"
+    "name": "Vladislav Karpman",
+    "url": "https://github.com/vladkarpman"
   },
-  "keywords": ["mobile", "testing", "ui", "yaml", "android", "ios"]
+  "repository": "https://github.com/vladkarpman/mobile-ui-testing",
+  "homepage": "https://github.com/vladkarpman/mobile-ui-testing#readme",
+  "license": "MIT",
+  "keywords": ["mobile", "testing", "ui", "yaml", "android", "ios", "mobile-mcp", "automation"]
 }
