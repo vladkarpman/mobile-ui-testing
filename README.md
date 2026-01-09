@@ -33,19 +33,17 @@ Before using this plugin, ensure you have:
 
 ## Installation
 
-### Option 1: npm (Recommended)
+### Option 1: Marketplace (Recommended)
 
 ```bash
-claude plugin add mobile-ui-testing
+# Add the marketplace (one time)
+claude plugin marketplace add vladkarpman/vladkarpman-plugins
+
+# Install the plugin
+claude plugin install mobile-ui-testing
 ```
 
-### Option 2: GitHub Direct
-
-```bash
-claude plugin add github:vladkarpman/mobile-ui-testing
-```
-
-### Option 3: Project-level
+### Option 2: Project-level
 
 Clone into your project's plugins directory:
 
@@ -56,7 +54,7 @@ cd .claude/plugins
 git clone https://github.com/vladkarpman/mobile-ui-testing.git
 ```
 
-### Option 4: Session-only
+### Option 3: Session-only
 
 Load for a single session:
 
@@ -66,10 +64,10 @@ claude --plugin-dir /path/to/mobile-ui-testing
 
 ## Uninstallation
 
-### If installed via npm/GitHub:
+### If installed via marketplace:
 
 ```bash
-claude plugin remove mobile-ui-testing
+claude plugin uninstall mobile-ui-testing
 ```
 
 ### If installed as project-level:
