@@ -1,7 +1,7 @@
 ---
 name: run-test
 description: Execute a YAML mobile UI test file on a connected device
-argument-hint: <test-file.yaml> [--report]
+argument-hint: <test-path> [--report]
 allowed-tools:
   - Read
   - Write
@@ -29,12 +29,14 @@ allowed-tools:
 
 # Run YAML Mobile UI Test
 
-Execute the YAML test file specified in the argument using mobile-mcp tools.
+Execute the YAML test specified in the argument using mobile-mcp tools.
 
 ## Arguments
 
-- `<test-file.yaml>` - Path to the YAML test file (required)
-- `--report` - Generate HTML/JSON report in `tests/reports/` (optional)
+- `<test-path>` - Path to test folder or YAML file (required)
+  - **Folder format**: `tests/login-flow/` (contains `test.yaml`)
+  - **File format**: `tests/login.test.yaml` (legacy)
+- `--report` - Generate HTML/JSON report (optional)
 
 ## Output Format
 
@@ -120,9 +122,23 @@ After all tests complete:
 
 ### 1. Parse Arguments
 
-Check if `--report` flag is present. Parse test file path.
+Check if `--report` flag is present. Parse test path.
 
-### 2. Read and Parse Test File
+### 2. Detect Test Format
+
+Check if argument is a folder or file:
+
+**If folder** (e.g., `tests/login-flow/`):
+- Test file: `{folder}/test.yaml`
+- Baselines: `{folder}/baselines/`
+- Reports go to: `{folder}/reports/`
+
+**If file** (e.g., `tests/login.test.yaml`):
+- Legacy flat file format
+- No baselines available
+- Reports go to: `tests/reports/`
+
+### 3. Read and Parse Test File
 
 Read the YAML test file. Parse:
 - `config` section: app package, device (optional)
@@ -130,7 +146,7 @@ Read the YAML test file. Parse:
 - `teardown` section: post-test actions
 - `tests` section: array of test cases
 
-### 3. Device Selection
+### 4. Device Selection
 
 If `config.device` is specified, use that device.
 Otherwise, call `mobile_list_available_devices` and:
@@ -138,7 +154,7 @@ Otherwise, call `mobile_list_available_devices` and:
 - If multiple: ask user to select
 - If none: report error and stop
 
-### 4. Initialize Report Data (if --report)
+### 5. Initialize Report Data (if --report)
 
 Create data structure to collect:
 - Test results (pass/fail, duration)
@@ -146,12 +162,12 @@ Create data structure to collect:
 - Screenshots at key points
 - Failure information
 
-### 5. Execute Setup
+### 6. Execute Setup
 
 Run all actions in `setup` section before any tests.
 Report each step with the detailed format above.
 
-### 6. Execute Each Test
+### 7. Execute Each Test
 
 For each test in `tests` array:
 1. Report: "Running: {test.name}" with separator line
@@ -164,18 +180,56 @@ For each test in `tests` array:
 4. Track end time
 5. Report: PASSED or FAILED with step count and duration
 
-### 7. Execute Teardown
+### 8. Baseline Comparison (if available)
+
+After each step that has a corresponding baseline:
+
+1. Take screenshot of current state
+2. Load baseline image from `baselines/step_{N}_*.png`
+3. Compare images:
+   - If similar (>90% match): PASS
+   - If different: WARN with visual diff
+
+Report baseline mismatches:
+```
+Step 3: tap "Login"
+  ✓ Action completed
+  ⚠ Visual mismatch with baseline
+    Expected: baselines/step_03_dashboard.png
+    Actual: reports/run_step_03.png
+    Diff: 15% pixels different
+```
+
+**Note**: Baseline comparison is only available for folder-format tests that have a `baselines/` directory.
+
+### 9. Execute Teardown
 
 Run all actions in `teardown` section after all tests (even if tests failed).
 
-### 8. Report Summary
+### 10. Report Summary
 
 Show the summary table with all test results.
 
-### 9. Generate Report (if --report)
+### 11. Generate Report (if --report)
 
 If `--report` flag was provided:
 
+**For folder-format tests** (`tests/login-flow/`):
+1. Create `{test-folder}/reports/` directory if needed
+2. Generate timestamp: `YYYY-MM-DD_HH-MM-SS`
+3. Save artifacts:
+   ```
+   {test-folder}/reports/
+   ├── {timestamp}_run.html           ← Visual report
+   ├── {timestamp}_run.json           ← Machine-readable
+   └── {timestamp}_screenshots/       ← Screenshots from this run
+       ├── step_01_login_screen.png
+       ├── step_02_after_tap.png
+       └── ...
+   ```
+4. Report: "Report saved: {test-folder}/reports/{timestamp}_run.html"
+
+**For file-format tests** (legacy `tests/login.test.yaml`):
 1. Create `tests/reports/` directory if needed
 2. Generate timestamp: `YYYY-MM-DD_HH-MM-SS`
 3. Save screenshots to `tests/reports/screenshots/`
@@ -293,8 +347,15 @@ Generate a styled HTML report with:
 
 ## Usage Examples
 
+**Folder format (recommended):**
+```
+/run-test tests/login-flow/
+/run-test tests/onboarding/ --report
+/run-test tests/checkout/ --report
+```
+
+**File format (legacy):**
 ```
 /run-test tests/login.test.yaml
 /run-test tests/onboarding.test.yaml --report
-/run-test tests/checkout.test.yaml --report
 ```
