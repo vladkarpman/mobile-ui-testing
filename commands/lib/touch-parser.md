@@ -62,6 +62,38 @@ When a gesture is detected:
 3. Get elements at touch location
 4. Merge with element-based detection for confirmation
 
+## Getting Max Coordinate Values
+
+Before parsing, get the device's max touch coordinates:
+
+```bash
+adb -s {device} shell getevent -p | grep -A 5 "ABS_MT_POSITION"
+```
+
+Output example:
+```
+ABS_MT_POSITION_X: value 0, min 0, max 1079
+ABS_MT_POSITION_Y: value 0, min 0, max 2339
+```
+
+Store max_x and max_y for coordinate conversion.
+
+## Batch Parsing (Post-Processing)
+
+When parsing a complete touch_log.txt file after recording:
+
+1. Read entire file
+2. Parse line by line, building gesture list
+3. For each gesture, convert coordinates using stored max values
+4. Return array of gestures with screen coordinates
+
+Example batch parsing flow:
+```
+touch_log.txt → parse all events → detect gestures → convert coords → [{type, x, y, timestamp}, ...]
+```
+
+This is more accurate than real-time parsing because we have complete data.
+
 ## Example Parse Loop
 
 ```
