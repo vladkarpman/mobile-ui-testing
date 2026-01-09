@@ -1,0 +1,9 @@
+{
+  "name": "mobile-ui-testing",
+  "version": "1.0.0",
+  "description": "YAML-based mobile UI testing framework for Claude Code with mobile-mcp",
+  "author": {
+    "name": "Vladislav Karpman"
+  },
+  "keywords": ["mobile", "testing", "ui", "yaml", "android", "ios"]
+}
