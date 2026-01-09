@@ -248,33 +248,42 @@ tests/
     └── reports/               # Run results and history
 ```
 
-### Recording with Guided Mode
+### Recording with Continuous Monitoring
 
-The recording flow guides you step-by-step:
+The recording flow automatically detects your actions in real-time:
 
 ```
 /record-test login-flow
 
-> Recording started. Do your first action, then say "done".
+> Recording started. I'm watching for your actions...
 
 *tap Login button*
-> done
-
-> Captured 3 states: Home → Loading → Login Form
-> Ready for next action.
+→ [1] Detected: tap "Login"
 
 *type email*
-> done
+→ [2] Detected: type in "Email" field
 
-> Captured: type in Email field
-> Ready for next action.
+*tap Password*
+→ [3] Detected: tap "Password"
 
-...
+*type password*
+→ [4] Detected: type in "Password" field
+
+*tap Sign In*
+→ [5] Detected: tap "Sign In"
 
 > stop
 
 > Recording complete! Generated tests/login-flow/test.yaml
+> Actions recorded: 5
 ```
+
+**Commands during recording:**
+- `stop` - End recording and generate YAML
+- `undo` - Remove last detected action
+- `done` - Force capture (if auto-detection missed something)
+
+**Detection latency:** ~300-500ms (actions are detected automatically)
 
 ### Running Folder-Format Tests
 
