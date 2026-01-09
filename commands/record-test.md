@@ -83,14 +83,12 @@ Device: {device-name}
 App: {app-package}
 Saving to: tests/{test-name}/
 
-CONTINUOUS MONITORING MODE
-──────────────────────────
-I'm watching for your actions in real-time.
-Just interact with your app - I'll detect:
-  • Taps and clicks
-  • Text input
-  • Swipes and scrolls
-  • Screen changes
+DUAL-DETECTION MODE
+───────────────────
+Channel 1: Touch events (< 10ms latency)
+Channel 2: Element monitoring (500ms polling)
+
+I'm watching for your actions in real-time...
 
 Commands:
   "stop" - End recording
@@ -100,66 +98,61 @@ Commands:
 ══════════════════════════════════════════════
 ```
 
-### 7. Continuous Monitoring Loop
+### 7. Start Touch Event Stream (Android)
 
-Start monitoring immediately after recording begins.
+For Android devices, start ADB getevent to capture touch events:
 
-**Polling Strategy:**
-- Poll `mobile_list_elements_on_screen` every 300-500ms
-- Compare element list with previous state
-- When change detected → capture screenshots + infer action
-
-**Loop Implementation:**
-
-```
-previous_elements = mobile_list_elements_on_screen()
-action_count = 0
-
-while recording_active:
-  # Fast poll (every 300-500ms)
-  current_elements = mobile_list_elements_on_screen()
-
-  # Detect significant changes
-  if elements_changed_significantly(previous_elements, current_elements):
-    action_count += 1
-
-    # Capture sequence (3 screenshots)
-    screenshots = [mobile_take_screenshot() for _ in range(3)]
-
-    # Infer action
-    action = infer_action(previous_elements, current_elements)
-
-    # Record and notify
-    record_action(action, screenshots)
-    output: "→ [{action_count}] Detected: {action.type} \"{action.target}\""
-
-  previous_elements = current_elements
-
-  # Check for user commands
-  if user_said("stop"):
-    break
-  elif user_said("undo"):
-    remove_last_action()
-  elif user_said("done"):
-    force_capture()
+**Command:**
+```bash
+adb -s {device} shell getevent -lt 2>/dev/null
 ```
 
-**Change Detection Heuristics:**
+**Parse touch events to detect:**
+- **Tap:** BTN_TOUCH DOWN → UP within 200ms, < 50px movement
+- **Swipe:** BTN_TOUCH DOWN, movement > 100px, UP
+- **Long press:** BTN_TOUCH DOWN held > 500ms
 
-A "significant change" means:
-- Element count changed by >2 elements
-- Key clickable element disappeared (button tapped)
-- Text field value changed (user typed)
-- Screen title/header changed (navigation)
-- Multiple elements shifted position (swipe)
+**On touch detected:**
+1. Record touch coordinates (x, y) and timestamp
+2. Immediately capture screenshot
+3. Get elements and find element at (x, y)
+4. Record action: `{type, target, coordinates, source: "touch_event"}`
+5. Notify user: "→ [N] tap at (x, y) on '{element}'"
 
-IGNORE these changes (likely animations):
-- Single element position shift <50px
-- Timestamp/clock updates
-- Progress indicators
-- Loading spinners appearing/disappearing
+**Coordinate conversion:**
+Raw getevent coordinates need conversion to screen coordinates.
+See `lib/touch-parser.md` for details.
 
-### 8. Action Inference
+### 8. Element Change Monitoring (Backup Channel)
+
+Poll `mobile_list_elements_on_screen` every 500ms as backup:
+
+**Purpose:**
+- Confirms touch events had visible effect
+- Catches non-touch changes (system dialogs, keyboards)
+- Provides element context for coordinate-only touches
+
+**On element change detected:**
+1. Check if recent touch event correlates
+2. If yes: mark touch event as "confirmed"
+3. If no touch: likely system event, record with low confidence
+
+### 9. Merge Detection Channels
+
+Correlate touch events with element changes for high-confidence recording:
+
+| Touch Event | Element Change | Action |
+|-------------|----------------|--------|
+| tap at (x,y) | element at (x,y) gone | tap "{element}" (HIGH confidence) |
+| tap at (x,y) | no change | tap [x, y] (LOW confidence, ask user) |
+| no touch | element changed | ignore (system event) |
+| swipe detected | elements shifted | swipe {direction} (HIGH confidence) |
+
+**Deduplication:**
+- If same action detected by both channels within 500ms → merge into one
+- Prefer element name over coordinates when available
+
+### 10. Action Inference
 
 When change detected, infer action type by analyzing element diff:
 
@@ -198,7 +191,7 @@ def infer_action(before, after):
   return None  # No significant action detected
 ```
 
-### 9. Handle User Commands
+### 11. Handle User Commands
 
 While monitoring, handle these commands:
 
