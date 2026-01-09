@@ -42,17 +42,26 @@ Call `mobile_list_available_devices`:
 
 ### 4. Initialize Recording State
 
-Create a recording state file at `.claude/recording-state.json`:
+Create recording state file and folder structure:
+
+```bash
+mkdir -p tests/{test-name}/screenshots
+mkdir -p tests/{test-name}/baselines
+mkdir -p tests/{test-name}/reports
+```
+
+Create `.claude/recording-state.json`:
 
 ```json
 {
   "testName": "{test-name}",
+  "testFolder": "tests/{test-name}",
   "appPackage": "{detected-package}",
   "device": "{device-id}",
   "startTime": "{ISO timestamp}",
   "status": "recording",
-  "actions": [],
-  "screenshots": []
+  "actionCount": 0,
+  "actions": []
 }
 ```
 
@@ -71,74 +80,106 @@ Recording started: {test-name}
 
 Device: {device-name}
 App: {app-package}
+Saving to: tests/{test-name}/
 
-Now interact with your app. I'm watching for:
-  • Taps and clicks
-  • Text input
-  • Swipes and scrolls
-  • Screen changes
+GUIDED RECORDING MODE
+─────────────────────
+1. Do an action on your device (tap, type, swipe)
+2. Say "done" when finished
+3. I'll capture and analyze
+4. Wait for "Ready" before next action
 
-When you're done, say "stop recording" or use:
-  /stop-recording
-
-Tip: Pause briefly between actions so I can capture each one.
-
+Do your first action, then say "done".
 ══════════════════════════════════════════════
 ```
 
-### 7. Continuous Monitoring
+### 7. Create Test Folder Structure
 
-While recording is active, periodically (every 1-2 seconds):
+Before starting, create the folder structure:
 
-1. **Take screenshot**: `mobile_take_screenshot`
-2. **Get current elements**: `mobile_list_elements_on_screen`
-3. **Detect changes** by comparing to previous state:
-   - New elements appeared → possible navigation
-   - Elements disappeared → possible navigation
-   - Text field content changed → user typed something
-   - Different screen layout → swipe or navigation occurred
+```
+tests/{test-name}/
+├── screenshots/
+├── baselines/
+└── reports/
+```
 
-4. **Infer actions** from changes:
-   - If a button disappeared and new screen appeared → tap on that button
-   - If text field has new content → type action
-   - If elements shifted position → swipe action
+Use Bash to create directories:
+```bash
+mkdir -p tests/{test-name}/screenshots
+mkdir -p tests/{test-name}/baselines
+mkdir -p tests/{test-name}/reports
+```
 
-5. **Record inferred action** with:
-   - Action type (tap, type, swipe)
-   - Target element (text or coordinates)
-   - Screenshot reference
-   - Timestamp
+### 8. Guided Recording Loop
 
-### 8. Handle User Messages
+Wait for user to say "done" (or variations: "ok", "next", "ready", "finished").
 
-While recording, if user provides context:
-- "I just tapped the login button" → confirm and record tap action
-- "I entered my email" → record type action with placeholder
-- "I scrolled down" → record swipe action
+When user signals done:
 
-### 9. Recording State Updates
+**Step 8.1: Burst Capture**
 
-After each detected action, update `.claude/recording-state.json`:
+Take 7 screenshots rapidly over 2 seconds:
 
+```
+for i in 1 to 7:
+  - mobile_take_screenshot → save to screenshots/{seq}_{timestamp}.png
+  - mobile_list_elements_on_screen → store elements
+  - wait 300ms
+```
+
+Save each screenshot to `tests/{test-name}/screenshots/` with naming:
+- `{action_number}_{shot_number}_{timestamp}.png`
+- Example: `001_01_20260109_204512.png`
+
+**Step 8.2: Analyze Screenshots**
+
+Compare consecutive screenshots:
+1. Diff element lists - what appeared/disappeared?
+2. Identify distinct states (group similar screenshots)
+3. Detect: tap (element gone), type (text changed), swipe (elements shifted), navigation (new screen)
+
+**Step 8.3: Report to User**
+
+```
+Captured 7 screenshots, detected {N} states:
+  1. {state_1_description}
+  2. {state_2_description}
+  ...
+
+Inferred action: {action_type} "{target}" → {result}
+
+Ready for next action.
+```
+
+**Step 8.4: Update Recording State**
+
+Add to `.claude/recording-state.json`:
 ```json
 {
   "actions": [
     {
+      "actionNumber": 1,
       "type": "tap",
       "target": "Login",
-      "coordinates": [540, 580],
-      "timestamp": "2025-01-09T16:30:05Z",
-      "screenshot": "recording_001.png"
-    },
-    {
-      "type": "type",
-      "text": "[user input]",
-      "timestamp": "2025-01-09T16:30:08Z",
-      "screenshot": "recording_002.png"
+      "states": ["home", "loading", "dashboard"],
+      "screenshots": ["001_01.png", "001_02.png", ...],
+      "timestamp": "2026-01-09T20:45:12Z"
     }
   ]
 }
 ```
+
+**Step 8.5: Loop**
+
+Repeat from step 8 until user says "stop recording" or "/stop-recording".
+
+### 9. Handle User Messages During Recording
+
+- "done" / "ok" / "next" / "finished" → trigger burst capture
+- "stop" / "stop recording" / "/stop-recording" → end recording
+- "undo" / "back" → remove last recorded action
+- Any other message → treat as context hint, store with next action
 
 ## Action Detection Heuristics
 
