@@ -83,86 +83,143 @@ Device: {device-name}
 App: {app-package}
 Saving to: tests/{test-name}/
 
-GUIDED RECORDING MODE
-─────────────────────
-1. Do an action on your device (tap, type, swipe)
-2. Say "done" when finished
-3. I'll capture and analyze
-4. Wait for "Ready" before next action
+CONTINUOUS MONITORING MODE
+──────────────────────────
+I'm watching for your actions in real-time.
+Just interact with your app - I'll detect:
+  • Taps and clicks
+  • Text input
+  • Swipes and scrolls
+  • Screen changes
 
-Do your first action, then say "done".
+Commands:
+  "stop" - End recording
+  "undo" - Remove last action
+  "done" - Force capture (if I missed something)
+
 ══════════════════════════════════════════════
 ```
 
-### 7. Guided Recording Loop
+### 7. Continuous Monitoring Loop
 
-Wait for user to say "done" (or variations: "ok", "next", "ready", "finished").
+Start monitoring immediately after recording begins.
 
-When user signals done:
+**Polling Strategy:**
+- Poll `mobile_list_elements_on_screen` every 300-500ms
+- Compare element list with previous state
+- When change detected → capture screenshots + infer action
 
-**Step 7.1: Burst Capture**
-
-Take 7 screenshots rapidly over 2 seconds:
-
-```
-for i in 1 to 7:
-  - mobile_take_screenshot → save to screenshots/{seq}_{timestamp}.png
-  - mobile_list_elements_on_screen → store elements
-  - wait 300ms
-```
-
-Save each screenshot to `tests/{test-name}/screenshots/` with naming:
-- `{action_number}_{shot_number}_{timestamp}.png`
-- Example: `001_01_20260109_204512.png`
-
-**Step 7.2: Analyze Screenshots**
-
-Compare consecutive screenshots:
-1. Diff element lists - what appeared/disappeared?
-2. Identify distinct states (group similar screenshots)
-3. Detect: tap (element gone), type (text changed), swipe (elements shifted), navigation (new screen)
-
-**Step 7.3: Report to User**
+**Loop Implementation:**
 
 ```
-Captured 7 screenshots, detected {N} states:
-  1. {state_1_description}
-  2. {state_2_description}
-  ...
+previous_elements = mobile_list_elements_on_screen()
+action_count = 0
 
-Inferred action: {action_type} "{target}" → {result}
+while recording_active:
+  # Fast poll (every 300-500ms)
+  current_elements = mobile_list_elements_on_screen()
 
-Ready for next action.
+  # Detect significant changes
+  if elements_changed_significantly(previous_elements, current_elements):
+    action_count += 1
+
+    # Capture sequence (3 screenshots)
+    screenshots = [mobile_take_screenshot() for _ in range(3)]
+
+    # Infer action
+    action = infer_action(previous_elements, current_elements)
+
+    # Record and notify
+    record_action(action, screenshots)
+    output: "→ [{action_count}] Detected: {action.type} \"{action.target}\""
+
+  previous_elements = current_elements
+
+  # Check for user commands
+  if user_said("stop"):
+    break
+  elif user_said("undo"):
+    remove_last_action()
+  elif user_said("done"):
+    force_capture()
 ```
 
-**Step 7.4: Update Recording State**
+**Change Detection Heuristics:**
 
-Add to `.claude/recording-state.json`:
-```json
-{
-  "actions": [
-    {
-      "actionNumber": 1,
-      "type": "tap",
-      "target": "Login",
-      "states": ["home", "loading", "dashboard"],
-      "screenshots": ["001_01.png", "001_02.png", ...],
-      "timestamp": "2026-01-09T20:45:12Z"
-    }
-  ]
-}
+A "significant change" means:
+- Element count changed by >2 elements
+- Key clickable element disappeared (button tapped)
+- Text field value changed (user typed)
+- Screen title/header changed (navigation)
+- Multiple elements shifted position (swipe)
+
+IGNORE these changes (likely animations):
+- Single element position shift <50px
+- Timestamp/clock updates
+- Progress indicators
+- Loading spinners appearing/disappearing
+
+### 8. Action Inference
+
+When change detected, infer action type by analyzing element diff:
+
+| Change Pattern | Inferred Action | Confidence |
+|----------------|-----------------|------------|
+| Clickable element gone + new screen | tap on element | high |
+| Text field value changed | type in field | high |
+| Multiple elements shifted same direction | swipe | medium |
+| Element disappeared, same screen | tap (dismiss) | medium |
+| New modal/dialog appeared | system event | low |
+
+**Inference Logic:**
+
+```
+def infer_action(before, after):
+  disappeared = elements_in(before) - elements_in(after)
+  appeared = elements_in(after) - elements_in(before)
+
+  # Check for tap
+  for elem in disappeared:
+    if elem.is_clickable and len(appeared) > 2:
+      return Action(type="tap", target=elem.text, confidence="high")
+
+  # Check for type
+  for elem in after:
+    if elem.type == "EditText":
+      before_elem = find_matching(before, elem)
+      if before_elem and elem.text != before_elem.text:
+        return Action(type="type", target=elem.text, confidence="high")
+
+  # Check for swipe
+  shift = calculate_element_shift(before, after)
+  if shift.magnitude > 100:
+    return Action(type="swipe", direction=shift.direction, confidence="medium")
+
+  return None  # No significant action detected
 ```
 
-**Step 7.5: Loop**
+### 9. Handle User Commands
 
-Repeat from Step 7.1 until user says "stop recording" or "/stop-recording".
+While monitoring, handle these commands:
 
-### 8. Handle User Messages During Recording
+| Command | Action |
+|---------|--------|
+| "stop" | End recording, proceed to stop-recording |
+| "undo" | Remove last detected action |
+| "done" | Force a capture (if auto-detection missed something) |
+| Any other text | Store as context for next action |
 
-- "done" / "ok" / "next" / "finished" → trigger burst capture
-- "stop" / "stop recording" / "/stop-recording" → end recording
-- "undo" / "back" → remove last recorded action
-- Any other message → treat as context hint, store with next action
+On "undo":
+```
+→ Removed: tap "Login"
+→ Actions: {count - 1} recorded
+```
+
+On user text (context):
+```
+→ Context noted: "{user_text}"
+→ Will attach to next detected action
+```
 
 ## Action Detection Heuristics
 
