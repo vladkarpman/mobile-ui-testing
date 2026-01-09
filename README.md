@@ -7,9 +7,12 @@ A Claude Code plugin for writing and running YAML-based mobile UI tests with [mo
 
 ## Features
 
-- **YAML Test Schema Knowledge** - Claude understands the complete test format and can help you write tests
-- **`/run-test`** - Execute YAML test files on real devices or simulators
+- **Auto-permissions** - mobile-mcp tools auto-approved, no manual confirmation needed
+- **`/run-test`** - Execute YAML test files with detailed output and HTML reports
 - **`/create-test`** - Scaffold new test files with proper structure
+- **`/generate-test`** - Generate tests from natural language descriptions
+- **`/record-test`** - Record user actions and generate YAML automatically
+- **YAML Test Schema Knowledge** - Claude understands the complete test format
 - **No compilation** - Just write YAML and run
 
 ## Prerequisites
@@ -119,37 +122,90 @@ tests:
 
 ## Commands
 
-### `/run-test <file>`
+### `/run-test <file> [--report]`
 
 Execute a YAML test file on a connected device.
 
 ```bash
-/run-test tests/onboarding.test.yaml
-/run-test tests/home-navigation.test.yaml
+/run-test tests/login.test.yaml
+/run-test tests/onboarding.test.yaml --report
 ```
 
-**What it does:**
-1. Reads and parses the YAML test file
-2. Connects to available device (or asks you to select)
-3. Runs setup actions
-4. Executes each test, reporting pass/fail
-5. Runs teardown actions
-6. Shows summary
+**With `--report` flag:** Generates HTML/JSON reports in `tests/reports/`.
+
+**Output format:**
+```
+Running: User login flow
+────────────────────────────────────────
+
+  [1/5] wait_for "Login"
+        ✓ Found in 1.2s
+
+  [2/5] tap "Email"
+        ✓ Tapped at (540, 320)
+
+  [3/5] type "user@example.com"
+        ✓ Typed 16 characters
+
+────────────────────────────────────────
+✓ PASSED  (5/5 steps in 4.2s)
+```
 
 ### `/create-test <name>`
 
-Create a new test file with proper structure.
+Create a new test file from a template.
 
 ```bash
 /create-test login
 /create-test checkout-flow
-/create-test profile-settings
 ```
 
-**What it does:**
-1. Detects app package from existing tests or asks you
-2. Creates `tests/<name>.test.yaml`
-3. Includes setup, teardown, and placeholder test
+### `/generate-test <description>`
+
+Generate a YAML test from a natural language description.
+
+```bash
+/generate-test "user logs in with email and password, sees home screen"
+/generate-test "scroll through feed and like the first post"
+```
+
+**Example output:**
+```yaml
+tests:
+  - name: User login flow
+    steps:
+      - wait_for: "Login"
+      - tap: "Email"
+      - type: "user@example.com"
+      - tap: "Password"
+      - type: "password123"
+      - tap: "Login"
+      - verify_screen: "Home screen"
+```
+
+### `/record-test <name>`
+
+Start recording user actions to generate a test automatically.
+
+```bash
+/record-test login-flow
+```
+
+Then interact with your app. Claude watches and records:
+- Taps and clicks
+- Text input
+- Swipes and scrolls
+- Screen changes
+
+### `/stop-recording`
+
+Stop recording and generate YAML from captured actions.
+
+```bash
+/stop-recording
+```
+
+Generates `tests/{name}.test.yaml` with all recorded steps.
 
 ## Test File Structure
 

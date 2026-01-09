@@ -1,6 +1,6 @@
 {
   "name": "claude-plugin-mobile-ui-testing",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "YAML-based mobile UI testing framework for Claude Code with mobile-mcp",
   "author": "Vladislav Karpman",
   "license": "MIT",
@@ -26,6 +26,7 @@
   "files": [
     ".claude-plugin",
     "commands",
+    "hooks",
     "skills",
     "templates",
     "README.md",

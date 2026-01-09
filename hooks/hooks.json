@@ -1,0 +1,15 @@
+{
+  "description": "Auto-approve mobile-mcp tools for seamless test execution",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
