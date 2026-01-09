@@ -61,8 +61,8 @@ Create `.claude/recording-state.json`:
   "device": "{device-id}",
   "startTime": "{ISO timestamp}",
   "status": "recording",
-  "actionCount": 0,
-  "actions": []
+  "snapshotCount": 0,
+  "screenshotCount": 0
 }
 ```
 
@@ -83,158 +83,96 @@ Device: {device-name}
 App: {app-package}
 Saving to: tests/{test-name}/
 
-DUAL-DETECTION MODE
-───────────────────
-Channel 1: Touch events (< 10ms latency)
-Channel 2: Element monitoring (500ms polling)
+POST-PROCESSING MODE
+────────────────────
+Capturing: Touch events + Element snapshots (200ms)
+Analysis: After you say "stop"
 
-I'm watching for your actions in real-time...
+Interact with your app now...
 
 Commands:
-  "stop" - End recording
-  "undo" - Remove last action
-  "done" - Force capture (if I missed something)
+  "stop" - End recording and analyze
+  "pause" - Pause capturing
+  "resume" - Resume capturing
 
 ══════════════════════════════════════════════
 ```
 
-### 7. Start Touch Event Stream (Android)
+### 7. Start Background Data Capture (Android)
 
-For Android devices, start ADB getevent to capture touch events:
+Start ADB getevent in background to capture all touch events:
 
 **Command:**
 ```bash
-adb -s {device} shell getevent -lt 2>/dev/null
+adb -s {device} shell getevent -lt > tests/{test-name}/touch_log.txt 2>/dev/null &
 ```
 
-**Parse touch events to detect:**
-- **Tap:** BTN_TOUCH DOWN → UP within 200ms, < 50px movement
-- **Swipe:** BTN_TOUCH DOWN, movement > 100px, UP
-- **Long press:** BTN_TOUCH DOWN held > 500ms
+Store the process info in recording state for cleanup.
 
-**On touch detected:**
-1. Record touch coordinates (x, y) and timestamp
-2. Immediately capture screenshot
-3. Get elements and find element at (x, y)
-4. Record action: `{type, target, coordinates, source: "touch_event"}`
-5. Notify user: "→ [N] tap at (x, y) on '{element}'"
-
-**Coordinate conversion:**
-Raw getevent coordinates need conversion to screen coordinates.
-See `lib/touch-parser.md` for details.
-
-### 8. Element Change Monitoring (Backup Channel)
-
-Poll `mobile_list_elements_on_screen` every 500ms as backup:
-
-**Purpose:**
-- Confirms touch events had visible effect
-- Catches non-touch changes (system dialogs, keyboards)
-- Provides element context for coordinate-only touches
-
-**On element change detected:**
-1. Check if recent touch event correlates
-2. If yes: mark touch event as "confirmed"
-3. If no touch: likely system event, record with low confidence
-
-### 9. Merge Detection Channels
-
-Correlate touch events with element changes for high-confidence recording:
-
-| Touch Event | Element Change | Action |
-|-------------|----------------|--------|
-| tap at (x,y) | element at (x,y) gone | tap "{element}" (HIGH confidence) |
-| tap at (x,y) | no change | tap [x, y] (LOW confidence, ask user) |
-| no touch | element changed | ignore (system event) |
-| swipe detected | elements shifted | swipe {direction} (HIGH confidence) |
-
-**Deduplication:**
-- If same action detected by both channels within 500ms → merge into one
-- Prefer element name over coordinates when available
-
-### 10. Action Inference
-
-When change detected, infer action type by analyzing element diff:
-
-| Change Pattern | Inferred Action | Confidence |
-|----------------|-----------------|------------|
-| Clickable element gone + new screen | tap on element | high |
-| Text field value changed | type in field | high |
-| Multiple elements shifted same direction | swipe | medium |
-| Element disappeared, same screen | tap (dismiss) | medium |
-| New modal/dialog appeared | system event | low |
-
-**Inference Logic:**
-
-```
-def infer_action(before, after):
-  disappeared = elements_in(before) - elements_in(after)
-  appeared = elements_in(after) - elements_in(before)
-
-  # Check for tap
-  for elem in disappeared:
-    if elem.is_clickable and len(appeared) > 2:
-      return Action(type="tap", target=elem.text, confidence="high")
-
-  # Check for type
-  for elem in after:
-    if elem.type == "EditText":
-      before_elem = find_matching(before, elem)
-      if before_elem and elem.text != before_elem.text:
-        return Action(type="type", target=elem.text, confidence="high")
-
-  # Check for swipe
-  shift = calculate_element_shift(before, after)
-  if shift.magnitude > 100:
-    return Action(type="swipe", direction=shift.direction, confidence="medium")
-
-  return None  # No significant action detected
+Initialize `tests/{test-name}/snapshots.json`:
+```json
+{
+  "startTime": "{ISO timestamp}",
+  "device": "{device-id}",
+  "screenSize": {"width": 1080, "height": 2400},
+  "maxCoords": {"x": 1079, "y": 2339},
+  "snapshots": []
+}
 ```
 
-### 11. Handle User Commands
+Get max coordinates for conversion:
+```bash
+adb -s {device} shell getevent -p | grep -A 5 "ABS_MT_POSITION"
+```
 
-While monitoring, handle these commands:
+### 8. Continuous Element Snapshots
+
+Poll `mobile_list_elements_on_screen` every 200ms:
+
+1. Get current elements
+2. Append to snapshots.json with timestamp
+3. If elements changed significantly from previous:
+   - Take screenshot: `screenshots/snapshot_{N}.png`
+   - Update snapshot entry with screenshot reference
+
+### 9. Recording State Schema
+
+Update `.claude/recording-state.json`:
+```json
+{
+  "testName": "{test-name}",
+  "testFolder": "tests/{test-name}",
+  "appPackage": "{detected-package}",
+  "device": "{device-id}",
+  "startTime": "{ISO timestamp}",
+  "status": "recording",
+  "snapshotCount": 0,
+  "screenshotCount": 0
+}
+```
+
+Note: `actions[]` removed - actions reconstructed during analysis.
+
+### 10. Handle User Commands
+
+While recording, handle:
 
 | Command | Action |
 |---------|--------|
-| "stop" | End recording, proceed to stop-recording |
-| "undo" | Remove last detected action |
-| "done" | Force a capture (if auto-detection missed something) |
-| Any other text | Store as context for next action |
+| "stop" | End recording, trigger analysis phase |
+| "pause" | Temporarily pause snapshot polling |
+| "resume" | Resume snapshot polling |
 
-On "undo":
+### 11. Recording Output
+
+After recording stops, test folder contains:
 ```
-→ Removed: tap "Login"
-→ Actions: {count - 1} recorded
+tests/{test-name}/
+├── touch_log.txt      # Raw ADB getevent output
+├── snapshots.json     # Element states every 200ms
+├── screenshots/       # Visual captures on changes
+└── (test.yaml created by analysis)
 ```
-
-On user text (context):
-```
-→ Context noted: "{user_text}"
-→ Will attach to next detected action
-```
-
-## Action Detection Heuristics
-
-### Tap Detection
-- Element that was visible is now gone or changed state
-- New screen appeared after element interaction
-- Button/clickable element was in focus area
-
-### Type Detection
-- Text field content changed
-- Keyboard was visible
-- Input field has new value
-
-### Swipe Detection
-- Multiple elements shifted in same direction
-- Scroll position changed
-- List items changed
-
-### Navigation Detection
-- Significant screen layout change
-- New elements appeared that weren't visible before
-- Different screen title or header
 
 ## Error Handling
 
