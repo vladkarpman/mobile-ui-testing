@@ -160,12 +160,12 @@ Enter choice (A/S/N):
 
 **If user selects specific screenshots:**
 - Copy selected screenshots to `tests/{test-name}/baselines/`
-- Rename with descriptive names (e.g., `initial_state.png`, `final_state.png`)
+- Rename with format: `step_{N}_{description}.png` (e.g., `step_01_home.png`, `step_02_login.png`, `step_03_dashboard.png`)
 - Add corresponding `verify_screenshot` steps to the generated YAML
 
 **Example baseline verification step:**
 ```yaml
-- verify_screenshot: "baselines/final_state.png"
+- verify_screenshot: "baselines/step_03_dashboard.png"
   threshold: 0.95  # 95% similarity required
 ```
 
@@ -175,12 +175,55 @@ Enter choice (A/S/N):
 2. Move all captured screenshots to `tests/{test-name}/screenshots/`
 3. Generate recording summary report at `tests/{test-name}/reports/recording-summary.html`
 
-**Recording summary report content:**
-- Test name and recording date
-- Total duration
-- Actions captured with timestamps
-- Screenshot gallery with annotations
-- Generated YAML preview
+**Recording summary HTML structure:**
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>{test-name} Recording Summary</title>
+  <style>/* Basic styling for readability */</style>
+</head>
+<body>
+  <h1>{test-name} Recording Summary</h1>
+  <p>Recorded on: {date} | Duration: {duration}</p>
+
+  <h2>Timeline</h2>
+  <ul>
+    <li>[00:00] App launched</li>
+    <li>[00:03] Tap: "Email" field</li>
+    <li>[00:05] Type: "user@example.com"</li>
+    <!-- List of all actions with timestamps -->
+  </ul>
+
+  <h2>Screenshots</h2>
+  <div class="gallery">
+    <figure>
+      <img src="../screenshots/screenshot_001.png" alt="Step 1">
+      <figcaption>Step 1: Initial state</figcaption>
+    </figure>
+    <figure>
+      <img src="../screenshots/screenshot_002.png" alt="Step 2">
+      <figcaption>Step 2: After login</figcaption>
+    </figure>
+    <!-- Gallery of all captured screenshots with relative paths -->
+  </div>
+
+  <h2>Generated YAML</h2>
+  <pre><code>
+# {test-name} (Recorded)
+config:
+  app: {app-package}
+
+tests:
+  - name: {test-name}
+    steps:
+      - tap: "Email"
+      - type: "user@example.com"
+      # Full generated test.yaml content
+  </code></pre>
+</body>
+</html>
+```
 
 ### 8. Report Success
 
