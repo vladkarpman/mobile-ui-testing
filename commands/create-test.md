@@ -23,7 +23,7 @@ Use the argument as the test name. If no argument provided, ask:
 ### 2. Detect App Package
 
 Try to detect the app package:
-1. Look for existing test files in `tests/mcp/*.test.yaml`
+1. Look for existing test files in `tests/*.test.yaml`
 2. Check for `config.app` in any existing test
 3. Look for Android manifest or build.gradle for package name
 
@@ -42,7 +42,7 @@ Options:
 
 ### 4. Generate Test File
 
-Create file at `tests/mcp/{test-name}.test.yaml`:
+Create file at `tests/{test-name}.test.yaml`:
 
 ```yaml
 # {Test Name} Tests
@@ -80,11 +80,11 @@ tests:
 
 Report:
 ```
-Created test file: tests/mcp/{test-name}.test.yaml
+Created test file: tests/{test-name}.test.yaml
 
 Next steps:
 1. Edit the file to add your test steps
-2. Run with: /run-test tests/mcp/{test-name}.test.yaml
+2. Run with: /run-test tests/{test-name}.test.yaml
 
 Quick reference:
 - tap: "Button"     - Tap element by text
@@ -138,17 +138,16 @@ tests:
 
 ## Directory Structure
 
-Always create tests in `tests/mcp/` directory:
+Always create tests in `tests/` directory:
 ```
 tests/
-└── mcp/
-    ├── onboarding.test.yaml
-    ├── login.test.yaml
-    ├── {new-test}.test.yaml
-    └── ...
+├── onboarding.test.yaml
+├── login.test.yaml
+├── {new-test}.test.yaml
+└── ...
 ```
 
-Create the `tests/mcp/` directory if it doesn't exist.
+Create the `tests/` directory if it doesn't exist.
 
 ## Usage Examples
 
