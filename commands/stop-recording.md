@@ -64,7 +64,16 @@ For each recorded action, convert to YAML step:
 
 ### 4. Generate YAML Test File
 
-Create `tests/{test-name}.test.yaml`:
+Create the test folder structure and generate `tests/{test-name}/test.yaml`:
+
+```bash
+# Create folder structure
+mkdir -p tests/{test-name}/screenshots
+mkdir -p tests/{test-name}/baselines
+mkdir -p tests/{test-name}/reports
+```
+
+Generate the test file:
 
 ```yaml
 # {Test Name} (Recorded)
@@ -129,25 +138,69 @@ Apply these improvements to recorded actions:
 - wait: 500ms
 ```
 
-### 6. Cleanup
+### 6. Create Baseline Images (Optional)
 
-1. Delete `.claude/recording-state.json`
-2. Optionally keep screenshots in `tests/recordings/{test-name}/`
-
-### 7. Report Success
+After generating the test, ask the user if they want to save key screenshots as baselines:
 
 ```
-Recording stopped!
+Would you like to save screenshots as baseline images for visual validation?
+
+Screenshots captured during recording:
+  1. screenshot_001.png - Initial state (after app launch)
+  2. screenshot_003.png - After login form filled
+  3. screenshot_005.png - Final state (dashboard)
+
+Options:
+  [A] Save ALL screenshots as baselines
+  [S] SELECT specific screenshots to save
+  [N] No baselines needed
+
+Enter choice (A/S/N):
+```
+
+**If user selects specific screenshots:**
+- Copy selected screenshots to `tests/{test-name}/baselines/`
+- Rename with descriptive names (e.g., `initial_state.png`, `final_state.png`)
+- Add corresponding `verify_screenshot` steps to the generated YAML
+
+**Example baseline verification step:**
+```yaml
+- verify_screenshot: "baselines/final_state.png"
+  threshold: 0.95  # 95% similarity required
+```
+
+### 7. Cleanup
+
+1. Delete `.claude/recording-state.json`
+2. Move all captured screenshots to `tests/{test-name}/screenshots/`
+3. Generate recording summary report at `tests/{test-name}/reports/recording-summary.html`
+
+**Recording summary report content:**
+- Test name and recording date
+- Total duration
+- Actions captured with timestamps
+- Screenshot gallery with annotations
+- Generated YAML preview
+
+### 8. Report Success
+
+```
+Recording complete!
 ══════════════════════════════════════════════
 
-Generated: tests/{test-name}.test.yaml
+Generated: tests/{test-name}/test.yaml
 
-Summary:
-  • Duration: {X}s
-  • Actions captured: {N}
-  • Screenshots: {M}
+Folder structure:
+  tests/{test-name}/
+  ├── test.yaml          ← Run with /run-test
+  ├── screenshots/       ← {N} images captured
+  ├── baselines/         ← {M} baseline images
+  └── reports/           ← Recording summary
 
-Steps generated:
+Actions recorded: {count}
+Duration: {time}
+
+Steps:
   1. tap: "Email"
   2. type: "user@example.com"
   3. tap: "Password"
@@ -157,14 +210,10 @@ Steps generated:
 
 ══════════════════════════════════════════════
 
-Next steps:
-  1. Review the generated test
-  2. Add verify_screen assertions
-  3. Replace placeholder values if needed
-  4. Run with: /run-test tests/{test-name}.test.yaml
+Next: Review test.yaml and run with /run-test tests/{test-name}
 ```
 
-### 8. Show Generated File
+### 9. Show Generated File
 
 Display the full generated YAML for user review:
 
