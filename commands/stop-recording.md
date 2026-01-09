@@ -37,34 +37,109 @@ Start a new recording with:
 2. Get final elements list
 3. Add to recording state
 
-### 3. Process Recorded Actions
+### 3. Load Recording State
 
-For each recorded action, convert to YAML step:
+Read the recording state file and validate:
+- Test name exists
+- App package is set
+- Snapshots were captured
 
-**Tap actions:**
-```yaml
-- tap: "{element text}"  # Prefer text over coordinates
+### 4. Stop Background Capture
+
+Kill the ADB getevent process:
+```bash
+pkill -f "adb.*getevent"
 ```
 
-**Type actions:**
-```yaml
-- tap: "{input field}"   # Focus the field first
-- type: "{entered text}"
+Verify touch_log.txt was written:
+```bash
+# Check file exists and has content
+ls -la tests/{test-name}/touch_log.txt
+wc -l tests/{test-name}/touch_log.txt
 ```
 
-**Swipe actions:**
+### 5. Parse Touch Log
+
+Read `tests/{test-name}/touch_log.txt` and extract gestures:
+
+1. Parse using logic from `lib/touch-parser.md`
+2. Load max coordinates from snapshots.json
+3. Convert raw coordinates to screen coordinates:
+   ```
+   screen_x = (raw_x / max_x) * screen_width
+   screen_y = (raw_y / max_y) * screen_height
+   ```
+4. Detect gesture types:
+   - **Tap:** DOWN→UP < 200ms, movement < 50px
+   - **Swipe:** DOWN→UP, movement >= 100px
+   - **Long press:** DOWN→UP >= 500ms, movement < 50px
+
+Output: Array of touch events with timestamps and screen coordinates
+
+### 6. Correlate Touch Events with Element Snapshots
+
+For each touch event:
+
+1. Find snapshot with closest timestamp (within 200ms)
+2. Search elements for one containing touch coordinates:
+   - Check if (x, y) is within element bounds
+   - Prefer clickable elements over containers
+3. Record correlation:
+   ```json
+   {
+     "touch": {"type": "tap", "x": 540, "y": 800, "timestamp": "..."},
+     "element": {"text": "Login", "bounds": [500, 780, 580, 820]},
+     "confidence": "high"
+   }
+   ```
+
+If no element found at coordinates:
+- confidence: "low"
+- element: null
+
+### 7. Detect Type Actions
+
+Compare consecutive snapshots for text field changes:
+
+1. Find EditText/TextField elements
+2. If text content changed between snapshots
+3. Record type action:
+   ```json
+   {
+     "type": "type",
+     "text": "user@email.com",
+     "target": "Email field",
+     "confidence": "high"
+   }
+   ```
+
+### 8. Generate YAML Test
+
+Build test.yaml from correlated actions:
+
 ```yaml
-- swipe: {direction}     # up, down, left, right
+config:
+  app: {app-package}
+
+steps:
+  # HIGH confidence - element found
+  - tap: "Login"
+
+  # HIGH confidence - text field changed
+  - type:
+      text: "user@email.com"
+      into: "Email"
+
+  # LOW confidence - no element at coords
+  - tap: [540, 1200]
+
+  # HIGH confidence - elements shifted
+  - swipe: down
 ```
 
-**Wait actions (inferred from timing gaps):**
-```yaml
-- wait: 1s               # Add between actions with >1s gap
-```
+Prefer element text over coordinates when available.
 
-### 4. Generate YAML Test File
-
-Create the test folder structure and generate `tests/{test-name}/test.yaml`:
+Create the test folder structure:
 
 ```bash
 # Create folder structure
@@ -73,7 +148,7 @@ mkdir -p tests/{test-name}/baselines
 mkdir -p tests/{test-name}/reports
 ```
 
-Generate the test file:
+Generate the test file at `tests/{test-name}/test.yaml`:
 
 ```yaml
 # {Test Name} (Recorded)
@@ -97,13 +172,33 @@ tests:
     timeout: {duration + buffer}s
     steps:
       # --- Recorded Actions ---
-      {generated steps}
+      {generated steps with confidence comments}
 
       # --- Verification (add manually) ---
       # - verify_screen: "Expected final state"
 ```
 
-### 5. Smart Enhancements
+### 9. Show Analysis Report
+
+Output summary:
+
+```
+Analysis complete: {N} touch events → {M} actions
+══════════════════════════════════════════════
+
+Actions detected:
+  1. tap "Login"           ← HIGH (element found)
+  2. type "user@email.com" ← HIGH (text field changed)
+  3. tap [540, 1200]       ← LOW (no element at coords)
+  ...
+
+Low confidence actions: {count}
+Consider reviewing actions marked LOW.
+
+Generated: tests/{test-name}/test.yaml
+```
+
+### 10. Smart Enhancements
 
 Apply these improvements to recorded actions:
 
@@ -138,7 +233,7 @@ Apply these improvements to recorded actions:
 - wait: 500ms
 ```
 
-### 6. Create Baseline Images (Optional)
+### 11. Create Baseline Images (Optional)
 
 After generating the test, ask the user if they want to save key screenshots as baselines:
 
@@ -169,11 +264,12 @@ Enter choice (A/S/N):
   threshold: 0.95  # 95% similarity required
 ```
 
-### 7. Cleanup
+### 12. Cleanup
 
 1. Delete `.claude/recording-state.json`
 2. Move all captured screenshots to `tests/{test-name}/screenshots/`
-3. Generate recording summary report at `tests/{test-name}/reports/recording-summary.html`
+3. Keep `touch_log.txt` for debugging purposes
+4. Generate recording summary report at `tests/{test-name}/reports/recording-summary.html`
 
 **Recording summary HTML structure:**
 ```html
@@ -187,12 +283,16 @@ Enter choice (A/S/N):
   <h1>{test-name} Recording Summary</h1>
   <p>Recorded on: {date} | Duration: {duration}</p>
 
+  <h2>Analysis Results</h2>
+  <p>Touch events: {N} | Actions generated: {M}</p>
+  <p>High confidence: {high_count} | Low confidence: {low_count}</p>
+
   <h2>Timeline</h2>
   <ul>
     <li>[00:00] App launched</li>
-    <li>[00:03] Tap: "Email" field</li>
-    <li>[00:05] Type: "user@example.com"</li>
-    <!-- List of all actions with timestamps -->
+    <li>[00:03] Tap: "Email" field (HIGH)</li>
+    <li>[00:05] Type: "user@example.com" (HIGH)</li>
+    <!-- List of all actions with timestamps and confidence -->
   </ul>
 
   <h2>Screenshots</h2>
@@ -225,7 +325,7 @@ tests:
 </html>
 ```
 
-### 8. Report Success
+### 13. Report Success
 
 ```
 Recording complete!
@@ -236,27 +336,33 @@ Generated: tests/{test-name}/test.yaml
 Folder structure:
   tests/{test-name}/
   ├── test.yaml          ← Run with /run-test
+  ├── touch_log.txt      ← Raw touch data
+  ├── snapshots.json     ← Element snapshots
   ├── screenshots/       ← {N} images captured
   ├── baselines/         ← {M} baseline images
   └── reports/           ← Recording summary
 
-Actions recorded: {count}
-Duration: {time}
+Analysis summary:
+  Touch events: {N}
+  Actions detected: {M}
+  High confidence: {high_count}
+  Low confidence: {low_count}
 
 Steps:
-  1. tap: "Email"
-  2. type: "user@example.com"
-  3. tap: "Password"
-  4. type: "********"
-  5. tap: "Login"
-  6. wait: 2s
+  1. tap: "Email"              ← HIGH
+  2. type: "user@example.com"  ← HIGH
+  3. tap: "Password"           ← HIGH
+  4. type: "********"          ← HIGH
+  5. tap: "Login"              ← HIGH
+  6. tap: [540, 1200]          ← LOW (no element)
 
 ══════════════════════════════════════════════
 
 Next: Review test.yaml and run with /run-test tests/{test-name}
+      Pay attention to LOW confidence actions - may need manual adjustment.
 ```
 
-### 9. Show Generated File
+### 14. Show Generated File
 
 Display the full generated YAML for user review:
 
@@ -266,18 +372,29 @@ Display the full generated YAML for user review:
 
 ## Action Conversion Rules
 
-| Detected | Generated YAML |
-|----------|----------------|
-| Tap on element with text | `- tap: "Element Text"` |
-| Tap on element without text | `- tap: [x, y]` with comment |
-| Text input | `- tap: "Field"` then `- type: "value"` |
-| Swipe up | `- swipe: up` |
-| Swipe down | `- swipe: down` |
-| Swipe left | `- swipe: left` |
-| Swipe right | `- swipe: right` |
-| Long press | `- long_press: "Element"` |
-| Back button | `- press: back` |
-| Time gap > 2s | `- wait: {gap}s` |
+| Detected | Generated YAML | Confidence |
+|----------|----------------|------------|
+| Tap on element with text | `- tap: "Element Text"` | HIGH |
+| Tap on element without text | `- tap: [x, y]` with comment | LOW |
+| Text input detected | `- type: { text: "value", into: "Field" }` | HIGH |
+| Swipe up | `- swipe: up` | HIGH |
+| Swipe down | `- swipe: down` | HIGH |
+| Swipe left | `- swipe: left` | HIGH |
+| Swipe right | `- swipe: right` | HIGH |
+| Long press on element | `- long_press: "Element"` | HIGH |
+| Long press at coords | `- long_press: [x, y]` | LOW |
+| Back button | `- press: back` | HIGH |
+| Time gap > 2s | `- wait: {gap}s` | N/A |
+
+## Confidence Levels
+
+- **HIGH:** Element found at touch coordinates, or text field change detected
+- **LOW:** No element found at coordinates, using raw coordinate fallback
+
+Low confidence actions should be reviewed manually - they may indicate:
+- Touch on non-labeled elements
+- Touch on dynamically loaded content
+- Timing mismatch between touch and snapshot
 
 ## Placeholder Handling
 
@@ -292,6 +409,8 @@ For sensitive data detected during recording:
 - If recording state is corrupted: offer to discard or attempt recovery
 - If no actions recorded: suggest user may need to interact more slowly
 - If screenshots missing: generate YAML without screenshot references
+- If touch_log.txt empty: warn user that no touches were captured
+- If snapshot correlation fails: use coordinates with LOW confidence
 
 ## Usage
 
