@@ -235,6 +235,54 @@ tests:
       - verify_screen: "Expected state"
 ```
 
+## Test Folder Structure (v2.0+)
+
+New recordings create an organized folder structure:
+
+```
+tests/
+└── login-flow/
+    ├── test.yaml              # Test definition
+    ├── screenshots/           # Captured during recording
+    ├── baselines/             # Golden images for validation
+    └── reports/               # Run results and history
+```
+
+### Recording with Guided Mode
+
+The recording flow guides you step-by-step:
+
+```
+/record-test login-flow
+
+> Recording started. Do your first action, then say "done".
+
+*tap Login button*
+> done
+
+> Captured 3 states: Home → Loading → Login Form
+> Ready for next action.
+
+*type email*
+> done
+
+> Captured: type in Email field
+> Ready for next action.
+
+...
+
+> stop
+
+> Recording complete! Generated tests/login-flow/test.yaml
+```
+
+### Running Folder-Format Tests
+
+```bash
+/run-test tests/login-flow/
+/run-test tests/login-flow/ --report
+```
+
 ## Available Actions
 
 ### Basic Actions
